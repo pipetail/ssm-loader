@@ -8,3 +8,7 @@
 |`SSM_OUTPUT_DIR`|`/secrets`|`true`|output directory for secrets|
 |`SSM_OUTPUT_FILENAME`|`secrets.json`|`true`|filename of the output configuration file, if `SSM_OUTPUT_DIR` is set to `/secrets`, the full path would be `/secrets/secrets.json`|
 |`SSM_LOAD_`**`<variable name>`**|`/backend/random-api-key`|`false`|this variable contains path to the certain SSM Parameters store value, if `SSM_PREFIX` is set to `/dev`, the full path would be `/dev/backend/random-api-key`|
+
+## AWS configuration
+
+## Kubernetes example
