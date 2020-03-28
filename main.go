@@ -31,6 +31,7 @@ func main() {
 	params := getParametersSpecification()
 	if cap(params) == 0 {
 		log.Println("no parameters provided, exiting")
+		return
 	}
 
 	// initialize AWS API session
