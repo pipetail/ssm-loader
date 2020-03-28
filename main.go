@@ -1,42 +1,64 @@
 package main
 
 import (
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ssm"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"strings"
 	"fmt"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/ssm"
+	"github.com/aws/aws-sdk-go/service/ssm/ssmiface"
 	"log"
 	"os"
+	"strings"
 )
 
 type Param struct {
-	Name string
-	Value string
-	Path string
-	Version int64
+	Name    string `json:"name"`
+	Value   string `json:"value"`
+	Path    string `json:"path"`
+	Version int64  `json:"version"`
+	Digest  string `json:"digest"`
+}
+
+// for debug only!
+func (i *Param) String() string {
+	return fmt.Sprintf("name = %s Value = %s Path = %s\n", i.Name, i.Value, i.Path)
 }
 
 func main() {
+	log.Println("starting execution")
 
 	// get list of variables
 	params := getParametersSpecification()
-	
+	if cap(params) == 0 {
+		log.Println("no parameters provided, exiting")
+	}
+
 	// initialize AWS API session
 	sess := session.Must(session.NewSessionWithOptions(session.Options{
 		SharedConfigState: session.SharedConfigEnable,
 		// tbd: add role ARN
 	}))
-	
+
 	// create SSM service
 	ssmSvc := ssm.New(sess)
 
+	err := obtainParams(ssmSvc, params)
+	if err != nil {
+		log.Fatalf("could not obtain params: %s", err)
+	}
+
+	fmt.Println(params)
+}
+
+// obtainParams receives specification of needed values and mutates
+// the input with received values (and versions)
+func obtainParams(ssmSvc ssmiface.SSMAPI, params []*Param) error {
 	for i := range params {
 		log.Printf("obtaining param '%s' @ %s", params[i].Name, params[i].Path)
 
 		// prepare AWS input struct
 		getParamInput := ssm.GetParameterInput{
-			Name: aws.String(params[i].Path),
+			Name:           aws.String(params[i].Path),
 			WithDecryption: aws.Bool(true),
 		}
 
@@ -44,20 +66,19 @@ func main() {
 		// fail if any error occurs
 		paramOutput, err := ssmSvc.GetParameter(&getParamInput)
 		if err != nil {
-			log.Fatalf("could not obtain param: %s", err)
+			return fmt.Errorf("could not obtain param '%s': %s", params[i].Name, err)
 		}
 
 		// mutate Value in the original specification slice
 		params[i].Value = *paramOutput.Parameter.Value
 		params[i].Version = *paramOutput.Parameter.Version
 	}
-
-	fmt.Println(params)
+	return nil
 }
 
 // getParametersSpecification is getting environment variables and
 // converts them to more convenient format: slice of Param
-func getParametersSpecification() (output []Param) {
+func getParametersSpecification() (output []*Param) {
 	// get all prefix for parameter paths e.g. /dev1, /production etc.
 	prefix := os.Getenv("SSM_PREFIX")
 
@@ -65,7 +86,7 @@ func getParametersSpecification() (output []Param) {
 	for _, e := range os.Environ() {
 		envPair := strings.SplitN(e, "=", 2)
 		if strings.Contains(envPair[0], "SSM_LOAD_") {
-			
+
 			// get name without SSM_LOAD_ i.e. SSM_LOAD_test becomes test
 			name := strings.Replace(envPair[0], "SSM_LOAD_", "", -1)
 
@@ -74,7 +95,7 @@ func getParametersSpecification() (output []Param) {
 				Name: name,
 				Path: prefix + envPair[1],
 			}
-			output = append(output, param)
+			output = append(output, &param)
 		}
 	}
 	return
