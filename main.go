@@ -10,7 +10,12 @@ import (
 	"os"
 	"strings"
 	"strconv"
+	"encoding/json"
 )
+
+type Output struct {
+	Parameters []*Param `json:"parameters"`
+}
 
 type GlobalConfiguration struct {
 	OutputDirectory string
@@ -57,14 +62,22 @@ func main() {
 	// create SSM service
 	ssmSvc := ssm.New(sess)
 
+	// get values from AWS SSM
 	err = obtainParams(ssmSvc, params)
 	if err != nil {
 		log.Fatalf("could not obtain params: %s", err)
 	}
-
 	if config.Debug {
 		log.Printf("Obtained parameters: %s", params)
 	}
+
+	// create configuration file
+	err = dumpToFile(params, config)
+	if err != nil {
+		log.Fatalf("could not create output file: %s", err)
+	}
+
+	return
 }
 
 // loadGlobalConfiguration load global configuration
@@ -85,6 +98,47 @@ func loadGlobalConfiguration() (GlobalConfiguration, error) {
 	config.Debug = debug
 	
 	return config, nil
+}
+
+// dumpToFile create the configuration file that can be loaded by
+// the application
+func dumpToFile(payload []*Param, config GlobalConfiguration) error {
+
+	// create output in the expected format
+	output := Output{
+		Parameters: payload,
+	}
+
+	// serialize output to JSON
+	jsonPayload, err := json.Marshal(output)
+	if err != nil {
+		return fmt.Errorf("could not marshal payload to JSON: %s", err)
+	}
+
+	// show JSON string if needed
+	if config.Debug {
+		log.Printf("json payload: %s", jsonPayload)
+	}
+
+	// assemble full path of the output file, additional slash is ok
+	fullPath := config.OutputDirectory + "/" + config.OutputFilename
+
+	// create config file to the requested location
+	f, err := os.Create(fullPath)
+	if err != nil {
+		return fmt.Errorf("could not create output file: %s", err)
+	}
+	defer f.Close()
+	log.Printf("writing configuration file to %s", fullPath)
+
+	// write JSON payload to the requested location
+	_, err = f.WriteString(string(jsonPayload))
+	if err != nil {
+		return fmt.Errorf("could not write JSON payload to file: %s", err)
+	}
+
+	// all done, cool
+	return nil
 }
 
 // obtainParams receives specification of needed values and mutates
