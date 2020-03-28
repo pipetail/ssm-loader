@@ -9,7 +9,14 @@ import (
 	"log"
 	"os"
 	"strings"
+	"strconv"
 )
+
+type GlobalConfiguration struct {
+	OutputDirectory string
+	OutputFilename string
+	Debug bool
+}
 
 type Param struct {
 	Name    string `json:"name"`
@@ -27,6 +34,13 @@ func (i *Param) String() string {
 func main() {
 	log.Println("starting execution")
 
+	// get global configuration
+	log.Println("loading global configuration")
+	config, err := loadGlobalConfiguration()
+	if err != nil {
+		log.Fatalf("something went wrong while loading global configuration: %s", err)
+	}
+
 	// get list of variables
 	params := getParametersSpecification()
 	if cap(params) == 0 {
@@ -43,12 +57,34 @@ func main() {
 	// create SSM service
 	ssmSvc := ssm.New(sess)
 
-	err := obtainParams(ssmSvc, params)
+	err = obtainParams(ssmSvc, params)
 	if err != nil {
 		log.Fatalf("could not obtain params: %s", err)
 	}
 
-	fmt.Println(params)
+	if config.Debug {
+		log.Printf("Obtained parameters: %s", params)
+	}
+}
+
+// loadGlobalConfiguration load global configuration
+func loadGlobalConfiguration() (GlobalConfiguration, error) {
+	config := GlobalConfiguration{}
+	config.OutputDirectory = os.Getenv("SSM_OUTPUT_DIR")
+	config.OutputFilename = os.Getenv("SSM_OUTPUT_FILENAME")
+	
+	if config.OutputDirectory == "" || config.OutputFilename == "" {
+		return config, fmt.Errorf("SSM_OUTPUT_DIR and SSM_OUTPUT_FILENAME must be provided")
+	}
+
+	// try to parse debug
+	debug, err := strconv.ParseBool(os.Getenv("SSM_DEBUG"))
+	if err != nil {
+		debug = false
+	}
+	config.Debug = debug
+	
+	return config, nil
 }
 
 // obtainParams receives specification of needed values and mutates
