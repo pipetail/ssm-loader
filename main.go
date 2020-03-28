@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -8,21 +9,26 @@ import (
 	"github.com/aws/aws-sdk-go/service/ssm/ssmiface"
 	"log"
 	"os"
-	"strings"
 	"strconv"
-	"encoding/json"
+	"strings"
 )
 
+// Output is used only for the formatting of JSON
+// payload
 type Output struct {
 	Parameters []*Param `json:"parameters"`
 }
 
+// GlobalConfiguration contains program configuration
+// except the list of parameters
 type GlobalConfiguration struct {
 	OutputDirectory string
-	OutputFilename string
-	Debug bool
+	OutputFilename  string
+	Debug           bool
 }
 
+// Param holds input specs and output value
+// for the further processing
 type Param struct {
 	Name    string `json:"name"`
 	Value   string `json:"value"`
@@ -85,7 +91,7 @@ func loadGlobalConfiguration() (GlobalConfiguration, error) {
 	config := GlobalConfiguration{}
 	config.OutputDirectory = os.Getenv("SSM_OUTPUT_DIR")
 	config.OutputFilename = os.Getenv("SSM_OUTPUT_FILENAME")
-	
+
 	if config.OutputDirectory == "" || config.OutputFilename == "" {
 		return config, fmt.Errorf("SSM_OUTPUT_DIR and SSM_OUTPUT_FILENAME must be provided")
 	}
@@ -96,7 +102,7 @@ func loadGlobalConfiguration() (GlobalConfiguration, error) {
 		debug = false
 	}
 	config.Debug = debug
-	
+
 	return config, nil
 }
 
