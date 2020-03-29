@@ -1,5 +1,8 @@
 # SSM Loader
 
+> Attention, this is experimental project. Don't even try to use it in your projects.
+> What happens if there's SSM outage? Well, this is the question I need to find answers for.
+
 ## Input variables
 
 |variable|example|required?|description|
